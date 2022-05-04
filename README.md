@@ -1,5 +1,5 @@
 # captum-nanodet
-Applying Captum library to ImageNat pretrained shufflenetv2 with [nanodet library](https://github.com/RangiLyu/nanodet)
+Applying Captum library to ImageNet pretrained shufflenetv2 with [nanodet library](https://github.com/RangiLyu/nanodet)
 
 # Instructions
 
