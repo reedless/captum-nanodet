@@ -83,7 +83,7 @@ def main():
     # run model
     thres = 0.35
     class_scores = wrapper(input_)
-    pred_classes = [i for i, x in enumerate(class_scores > thres) if x]
+    pred_classes = [i for i, x in enumerate(class_scores[0] > thres) if x]
 
     for pred_class in pred_classes:
         # Integrated Gradients
