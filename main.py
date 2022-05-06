@@ -47,26 +47,14 @@ class WrapperModel(torch.nn.Module):
 def main():
     device = torch.device('cuda')
 
-    # file paths
-    config_path = 'demo/nanodet-plus-m_416.yml'
-    model_path = 'demo/nanodet-plus-m_416_checkpoint.ckpt'
-    image_path = 'demo/000252.jpg'
-
     # set up
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
 
-    # load config
-    load_config(cfg, config_path)
-    logger = Logger(-1, use_tensorboard=False)
-
-    # load model
-    wrapper = WrapperModel(cfg, model_path, logger, device=device)
-
     # load image
+    image_path = 'demo/000252.jpg'
     img = cv2.imread(image_path)
 
     # preprocessing
@@ -95,19 +83,30 @@ def main():
     baseline = torch.zeros(input_.shape).to(device).type(torch.cuda.FloatTensor)
     baseline_dist = torch.randn(5, input_.shape[1], input_.shape[2], input_.shape[3]).to(device) * 0.001
 
-    # run model
-    thres = 0.35
-    class_scores = wrapper(input_)
-    pred_classes = [i for i, x in enumerate(class_scores[0] > thres) if x]
+    epochs = [300, 500]
 
-    for pred_class in pred_classes:
+    for epoch in epochs:
+        # file paths
+        config_path = f'assets/nanodet-{epoch}/nanodet-{epoch}.pth_train_config.yml'
+        model_path = f'assets/nanodet-{epoch}/nanodet-{epoch}.pth'
+
+        # load config
+        load_config(cfg, config_path)
+        logger = Logger(-1, use_tensorboard=False)
+
+        # load model
+        wrapper = WrapperModel(cfg, model_path, logger, device=device)
+
+        # run model
+        pred_class = 0
+
         # Integrated Gradients
         ig = IntegratedGradients(wrapper)
         attributions, delta = ig.attribute(input_,
                                         target=pred_class,
                                         return_convergence_delta=True)
         print('Integrated Gradients Convergence Delta:', delta)
-        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'IntegratedGradients', pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'IntegratedGradients', epoch)
 
         # Gradient SHAP
         gs = GradientShap(wrapper)
@@ -118,56 +117,56 @@ def main():
 
         print('GradientShap Convergence Delta:', delta)
         print('GradientShap Average Delta per example:', torch.mean(delta.reshape(input_.shape[0], -1), dim=1))
-        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'GradientShap', pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'GradientShap', epoch)
 
         # # Deep Lift
         # dl = DeepLift(wrapper)
         # attributions, delta = dl.attribute(input_, baseline, target=pred_class, return_convergence_delta=True)
         # print('DeepLift Convergence Delta:', delta)
-        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'DeepLift', pred_class)
+        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'DeepLift', epoch)
 
         # # DeepLiftShap
         # dls = DeepLiftShap(wrapper)
         # attributions, delta = dls.attribute(input_.float(), baseline_dist, target=pred_class, return_convergence_delta=True)
         # print('DeepLiftShap Convergence Delta:', delta)
         # print('Deep Lift SHAP Average delta per example:', torch.mean(delta.reshape(input_.shape[0], -1), dim=1))
-        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'DeepLiftShap', pred_class)
+        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'DeepLiftShap', epoch)
 
         # Saliency
         saliency = Saliency(wrapper)
         attributions = saliency.attribute(input_, target=pred_class)
-        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Saliency', pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Saliency', epoch)
 
         # InputXGradient
         inputxgradient = InputXGradient(wrapper)
         attributions = inputxgradient.attribute(input_, target=pred_class)
-        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'InputXGradient', pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'InputXGradient', epoch)
 
         # Deconvolution
         deconv = Deconvolution(wrapper)
         attributions = deconv.attribute(input_, target=pred_class)
-        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Deconvolution', pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Deconvolution', epoch)
 
         # Guided Backprop
         gbp = GuidedBackprop(wrapper)
         attributions = gbp.attribute(input_, target=pred_class)
-        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'GuidedBackprop', pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'GuidedBackprop', epoch)
 
         # # FeatureAblation
         # ablator = FeatureAblation(wrapper)
         # attributions = ablator.attribute(input_, target=pred_class, show_progress=True)
-        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'FeatureAblation', pred_class)
+        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'FeatureAblation', epoch)
 
         # # Occlusion
         # ablator = Occlusion(wrapper)
         # attributions = ablator.attribute(input_, target=pred_class, sliding_window_shapes=(1, 3,3), show_progress=True)
-        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Occlusion', pred_class)
+        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Occlusion', epoch)
 
 
-def save_attr_mask(attributions, img, algo_name, pred_class):
+def save_attr_mask(attributions, img, algo_name, epoch):
     # save attributions
-    os.makedirs(f'attributions/{algo_name}', exist_ok=True)
-    torch.save(attributions, f'attributions/{algo_name}/{pred_class}_attributions.pt')
+    os.makedirs(f'attributions/{epoch}/{algo_name}', exist_ok=True)
+    torch.save(attributions, f'attributions/{epoch}/{algo_name}_attributions.pt')
 
     # C, H, W -> H, W, C
     attributions = attributions[0].permute(1,2,0).detach().cpu().numpy()
@@ -191,8 +190,8 @@ def save_attr_mask(attributions, img, algo_name, pred_class):
     plt.tight_layout()
 
     # save masks
-    os.makedirs(f'outputs/{algo_name}', exist_ok=True)
-    plt.savefig(f'outputs/{algo_name}/{pred_class}_mask.png', bbox_inches='tight')
+    os.makedirs(f'outputs/{epoch}/{algo_name}', exist_ok=True)
+    plt.savefig(f'outputs/{epoch}/{algo_name}_mask.png', bbox_inches='tight')
     plt.close()
     
 if __name__ == "__main__":
