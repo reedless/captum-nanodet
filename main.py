@@ -27,30 +27,21 @@ class WrapperModel(torch.nn.Module):
         self.model = model.to(device).eval()
 
     def forward(self, tensor_img):
+        tensor_img = tensor_img.to(self.device)
+
+        if len(tensor_img.shape) == 3:
+            tensor_img = tensor_img.unsqueeze(0)
+
         if len(tensor_img.shape) == 4:
-            list_max_cls_scores = []
-            for i in range(tensor_img.shape[0]):
-                numpy_img = tensor_img[i].permute(1, 2, 0).detach().cpu().numpy().astype(np.uint8)
-
-                from nanodet.data.transform.warp import ShapeTransform
-                from nanodet.data.transform.color import color_aug_and_norm
-                import functools
-
-                meta = ShapeTransform(cfg.data.val.keep_ratio, **cfg.data.val.pipeline)({"img": numpy_img}, cfg.data.val.input_size)
-                meta = functools.partial(color_aug_and_norm, kwargs=cfg.data.val.pipeline)(meta)
-
-                processed_tensor_img = torch.from_numpy(meta["img"].transpose(2, 0, 1)).to(self.device).type(torch.cuda.FloatTensor).unsqueeze(0)
-
-                preds = self.model(processed_tensor_img)
-
-                cls_scores = preds.split(
-                    [self.num_classes, 4 * (self.reg_max + 1)], dim=-1
-                )[0]
-
-                max_cls_scores = torch.max(cls_scores.sigmoid()[0], dim=0)[0]
-
-                list_max_cls_scores.append(max_cls_scores)
-            return torch.stack(list_max_cls_scores)
+            preds = self.model(tensor_img)
+            cls_scores = preds.split(
+                [self.num_classes, 4 * (self.reg_max + 1)], dim=-1
+            )[0]
+            
+            max_cls_scores = torch.max(cls_scores.sigmoid(), dim=1)[0]
+            return max_cls_scores
+        else:
+            raise ValueError('tensor_img.shape must be (N, C, H, W) or (C, H, W)')
     
 def main():
     device = torch.device('cuda')
@@ -77,8 +68,29 @@ def main():
     # load image
     img = cv2.imread(image_path)
 
-    # convert img to tensor
-    input_   = torch.from_numpy(img).permute(2,0,1).to(device).type(torch.cuda.FloatTensor).unsqueeze(0)
+    # preprocessing
+    raw_height = img.shape[0]
+    raw_width  = img.shape[1]
+    dst_width, dst_height = cfg.data.val.input_size
+    ResizeM = np.eye(3)
+    ResizeM[0, 0] *= dst_width / raw_width
+    ResizeM[1, 1] *= dst_height / raw_height
+
+    # scaling only
+    numpy_img_warped = cv2.warpPerspective(img, 
+                                        ResizeM, 
+                                        dsize=tuple(cfg.data.val.input_size), 
+                                        flags = cv2.INTER_LINEAR, 
+                                        borderMode = cv2.BORDER_CONSTANT)
+
+    # normalise
+    mean, std = cfg.data.val.pipeline["normalize"]
+    mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3) / 255
+    std = np.array(std, dtype=np.float32).reshape(1, 1, 3) / 255
+    numpy_img_normalised = ((numpy_img_warped.astype(np.float32) / 255) - mean) / std
+
+    # numpy to pytorch
+    input_ = torch.from_numpy(numpy_img_normalised.transpose(2, 0, 1)).to(device).type(torch.cuda.FloatTensor).unsqueeze(0)
 
     # run model
     thres = 0.35
