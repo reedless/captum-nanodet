@@ -56,33 +56,6 @@ def main():
     # load image
     image_path = 'demo/000252.jpg'
     img = cv2.imread(image_path)
-
-    # preprocessing
-    raw_height = img.shape[0]
-    raw_width  = img.shape[1]
-    dst_width, dst_height = cfg.data.val.input_size
-    ResizeM = np.eye(3)
-    ResizeM[0, 0] *= dst_width / raw_width
-    ResizeM[1, 1] *= dst_height / raw_height
-
-    # scaling only
-    numpy_img_warped = cv2.warpPerspective(img, 
-                                        ResizeM, 
-                                        dsize=tuple(cfg.data.val.input_size), 
-                                        flags = cv2.INTER_LINEAR, 
-                                        borderMode = cv2.BORDER_CONSTANT)
-
-    # normalise
-    mean, std = cfg.data.val.pipeline["normalize"]
-    mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3) / 255
-    std = np.array(std, dtype=np.float32).reshape(1, 1, 3) / 255
-    numpy_img_normalised = ((numpy_img_warped.astype(np.float32) / 255) - mean) / std
-
-    # convert to tensor, define baseline and baseline distribution
-    input_ = torch.from_numpy(numpy_img_normalised.transpose(2, 0, 1)).to(device).type(torch.cuda.FloatTensor).unsqueeze(0)
-    baseline = torch.zeros(input_.shape).to(device).type(torch.cuda.FloatTensor)
-    baseline_dist = torch.randn(5, input_.shape[1], input_.shape[2], input_.shape[3]).to(device) * 0.001
-
     epochs = [300, 500]
 
     for epoch in epochs:
@@ -97,7 +70,32 @@ def main():
         # load model
         wrapper = WrapperModel(cfg, model_path, logger, device=device)
 
-        # run model
+        # preprocessing
+        raw_height = img.shape[0]
+        raw_width  = img.shape[1]
+        dst_width, dst_height = cfg.data.val.input_size
+        ResizeM = np.eye(3)
+        ResizeM[0, 0] *= dst_width / raw_width
+        ResizeM[1, 1] *= dst_height / raw_height
+
+        # scaling only
+        numpy_img_warped = cv2.warpPerspective(img, 
+                                            ResizeM, 
+                                            dsize=tuple(cfg.data.val.input_size), 
+                                            flags = cv2.INTER_LINEAR, 
+                                            borderMode = cv2.BORDER_CONSTANT)
+
+        # normalise
+        mean, std = cfg.data.val.pipeline["normalize"]
+        mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3) / 255
+        std = np.array(std, dtype=np.float32).reshape(1, 1, 3) / 255
+        numpy_img_normalised = ((numpy_img_warped.astype(np.float32) / 255) - mean) / std
+
+        # convert to tensor, define baseline and baseline distribution
+        input_ = torch.from_numpy(numpy_img_normalised.transpose(2, 0, 1)).to(device).type(torch.cuda.FloatTensor).unsqueeze(0)
+        baseline = torch.zeros(input_.shape).to(device).type(torch.cuda.FloatTensor)
+        baseline_dist = torch.randn(5, input_.shape[1], input_.shape[2], input_.shape[3]).to(device) * 0.001
+
         pred_class = 0
 
         # Integrated Gradients
