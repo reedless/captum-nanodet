@@ -165,9 +165,8 @@ def main():
 
 
 def save_attr_mask(attributions, img, algo_name, pred_class):
-    os.makedirs(f'attributions/{algo_name}', exist_ok=True)
-
     # save attributions
+    os.makedirs(f'attributions/{algo_name}', exist_ok=True)
     torch.save(attributions, f'attributions/{algo_name}/{pred_class}_attributions.pt')
 
     # C, H, W -> H, W, C
@@ -180,6 +179,7 @@ def save_attr_mask(attributions, img, algo_name, pred_class):
     attributions -= np.min(attributions)
     attributions /= np.max(attributions)
 
+    # plot masks
     _, axs = plt.subplots(nrows=1, ncols=2, squeeze=False, figsize=(8, 8))
     axs[0, 0].set_title('Attribution mask')
     axs[0, 0].imshow(attributions, cmap=plt.cm.inferno)
@@ -189,7 +189,10 @@ def save_attr_mask(attributions, img, algo_name, pred_class):
     axs[0, 1].imshow(img, alpha=0.5)
     axs[0, 1].axis('off')
     plt.tight_layout()
-    plt.savefig(f'outputs/{algo_name}_mask.png', bbox_inches='tight')
+
+    # save masks
+    os.makedirs(f'outputs/{algo_name}', exist_ok=True)
+    plt.savefig(f'outputs/{algo_name}/{pred_class}_mask.png', bbox_inches='tight')
 
 if __name__ == "__main__":
     main()
