@@ -54,7 +54,7 @@ def main():
     torch.backends.cudnn.benchmark = True
 
     # load image
-    image_path = 'demo/000252.jpg'
+    image_path = 'dataset/night/20201201_000505.jpg'
     img = cv2.imread(image_path)
     epochs = [300, 500]
 
