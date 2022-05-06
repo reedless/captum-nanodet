@@ -165,6 +165,8 @@ def main():
 
 
 def save_attr_mask(attributions, img, algo_name, pred_class):
+    os.makedir(f'attributions/{algo_name}', exist_ok=True)
+
     # save attributions
     torch.save(attributions, f'attributions/{algo_name}/{pred_class}_attributions.pt')
 
