@@ -1,5 +1,6 @@
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
@@ -89,8 +90,10 @@ def main():
     std = np.array(std, dtype=np.float32).reshape(1, 1, 3) / 255
     numpy_img_normalised = ((numpy_img_warped.astype(np.float32) / 255) - mean) / std
 
-    # numpy to pytorch
+    # convert to tensor, define baseline and baseline distribution
     input_ = torch.from_numpy(numpy_img_normalised.transpose(2, 0, 1)).to(device).type(torch.cuda.FloatTensor).unsqueeze(0)
+    baseline = torch.zeros(input_.shape).to(device).type(torch.cuda.FloatTensor)
+    baseline_dist = torch.randn(5, input_.shape[1], input_.shape[2], input_.shape[3]).to(device) * 0.001
 
     # run model
     thres = 0.35
@@ -104,7 +107,87 @@ def main():
                                         target=pred_class,
                                         return_convergence_delta=True)
         print('Integrated Gradients Convergence Delta:', delta)
-        print(attributions)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'IntegratedGradients', pred_class)
+
+        # Gradient SHAP
+        gs = GradientShap(wrapper)
+        attributions, delta = gs.attribute(input_,
+                                        stdevs=0.09, n_samples=4, baselines=baseline_dist,
+                                        target=pred_class, 
+                                        return_convergence_delta=True)
+
+        print('GradientShap Convergence Delta:', delta)
+        print('GradientShap Average Delta per example:', torch.mean(delta.reshape(input_.shape[0], -1), dim=1))
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'GradientShap', pred_class)
+
+        # Deep Lift
+        dl = DeepLift(wrapper)
+        attributions, delta = dl.attribute(input_, baseline, target=pred_class, return_convergence_delta=True)
+        print('DeepLift Convergence Delta:', delta)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'DeepLift', pred_class)
+
+        # DeepLiftShap
+        dls = DeepLiftShap(wrapper)
+        attributions, delta = dls.attribute(input_.float(), baseline_dist, target=pred_class, return_convergence_delta=True)
+        print('DeepLiftShap Convergence Delta:', delta)
+        print('Deep Lift SHAP Average delta per example:', torch.mean(delta.reshape(input_.shape[0], -1), dim=1))
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'DeepLiftShap', pred_class)
+
+        # Saliency
+        saliency = Saliency(wrapper)
+        attributions = saliency.attribute(input_, target=pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Saliency', pred_class)
+
+        # InputXGradient
+        inputxgradient = InputXGradient(wrapper)
+        attributions = inputxgradient.attribute(input_, target=pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'InputXGradient', pred_class)
+
+        # Deconvolution
+        deconv = Deconvolution(wrapper)
+        attributions = deconv.attribute(input_, target=pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Deconvolution', pred_class)
+
+        # Guided Backprop
+        gbp = GuidedBackprop(wrapper)
+        attributions = gbp.attribute(input_, target=pred_class)
+        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'GuidedBackprop', pred_class)
+
+        # # FeatureAblation
+        # ablator = FeatureAblation(wrapper)
+        # attributions = ablator.attribute(input_, target=pred_class, show_progress=True)
+        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'FeatureAblation', pred_class)
+
+        # # Occlusion
+        # ablator = Occlusion(wrapper)
+        # attributions = ablator.attribute(input_, target=pred_class, sliding_window_shapes=(1, 3,3), show_progress=True)
+        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Occlusion', pred_class)
+
+
+def save_attr_mask(attributions, img, algo_name, pred_class):
+    # save attributions
+    torch.save(attributions, f'attributions/{algo_name}/{pred_class}_attributions.pt')
+
+    # C, H, W -> H, W, C
+    attributions = attributions[0].permute(1,2,0).detach().cpu().numpy()
+
+    # flattern to 1D
+    attributions = np.sum(np.abs(attributions), axis=-1)
+
+    # normalise attributions
+    attributions -= np.min(attributions)
+    attributions /= np.max(attributions)
+
+    _, axs = plt.subplots(nrows=1, ncols=2, squeeze=False, figsize=(8, 8))
+    axs[0, 0].set_title('Attribution mask')
+    axs[0, 0].imshow(attributions, cmap=plt.cm.inferno)
+    axs[0, 0].axis('off')
+    axs[0, 1].set_title(f'Overlay {algo_name} on Input image ')
+    axs[0, 1].imshow(attributions, cmap=plt.cm.inferno)
+    axs[0, 1].imshow(img, alpha=0.5)
+    axs[0, 1].axis('off')
+    plt.tight_layout()
+    plt.savefig(f'outputs/{algo_name}_mask.png', bbox_inches='tight')
 
 if __name__ == "__main__":
     main()
