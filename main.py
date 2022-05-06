@@ -193,6 +193,7 @@ def save_attr_mask(attributions, img, algo_name, pred_class):
     # save masks
     os.makedirs(f'outputs/{algo_name}', exist_ok=True)
     plt.savefig(f'outputs/{algo_name}/{pred_class}_mask.png', bbox_inches='tight')
-
+    plt.close()
+    
 if __name__ == "__main__":
     main()
