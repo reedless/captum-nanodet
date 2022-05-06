@@ -1,0 +1,16 @@
+model size is  1.0x
+init weights...
+=> loading pretrained model https://download.pytorch.org/models/shufflenetv2_x1-5666bf0f80.pth
+Finish initialize NanoDet-Plus Head.
+Integrated Gradients Convergence Delta: tensor([-0.1273], device='cuda:0', dtype=torch.float64)
+GradientShap Convergence Delta: tensor([-0.3591, -0.1426, -0.1756, -0.0791], device='cuda:0')
+GradientShap Average Delta per example: tensor([-0.1891], device='cuda:0')
+Integrated Gradients Convergence Delta: tensor([-0.0558], device='cuda:0', dtype=torch.float64)
+GradientShap Convergence Delta: tensor([-0.1332, -0.5567,  1.7965, -0.7007], device='cuda:0')
+GradientShap Average Delta per example: tensor([0.1015], device='cuda:0')
+Integrated Gradients Convergence Delta: tensor([-0.0457], device='cuda:0', dtype=torch.float64)
+GradientShap Convergence Delta: tensor([-0.4407,  0.4311, -0.5782, -0.1774], device='cuda:0')
+GradientShap Average Delta per example: tensor([-0.1913], device='cuda:0')
+Integrated Gradients Convergence Delta: tensor([-0.0159], device='cuda:0', dtype=torch.float64)
+GradientShap Convergence Delta: tensor([ 5.4565, -0.5164, -0.3573, -1.1794], device='cuda:0')
+GradientShap Average Delta per example: tensor([0.8508], device='cuda:0')
