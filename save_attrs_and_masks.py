@@ -93,8 +93,6 @@ def main():
 
         # convert to tensor, define baseline and baseline distribution
         input_ = torch.from_numpy(numpy_img_normalised.transpose(2, 0, 1)).to(device).type(torch.cuda.FloatTensor).unsqueeze(0)
-        baseline = torch.zeros(input_.shape).to(device).type(torch.cuda.FloatTensor)
-        baseline_dist = torch.randn(5, input_.shape[1], input_.shape[2], input_.shape[3]).to(device) * 0.001
 
         pred_class = 0
 
@@ -105,30 +103,6 @@ def main():
                                         return_convergence_delta=True)
         print('Integrated Gradients Convergence Delta:', delta)
         save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'IntegratedGradients', epoch)
-
-        # Gradient SHAP
-        gs = GradientShap(wrapper)
-        attributions, delta = gs.attribute(input_,
-                                        stdevs=0.09, n_samples=4, baselines=baseline_dist,
-                                        target=pred_class, 
-                                        return_convergence_delta=True)
-
-        print('GradientShap Convergence Delta:', delta)
-        print('GradientShap Average Delta per example:', torch.mean(delta.reshape(input_.shape[0], -1), dim=1))
-        save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'GradientShap', epoch)
-
-        # # Deep Lift
-        # dl = DeepLift(wrapper)
-        # attributions, delta = dl.attribute(input_, baseline, target=pred_class, return_convergence_delta=True)
-        # print('DeepLift Convergence Delta:', delta)
-        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'DeepLift', epoch)
-
-        # # DeepLiftShap
-        # dls = DeepLiftShap(wrapper)
-        # attributions, delta = dls.attribute(input_.float(), baseline_dist, target=pred_class, return_convergence_delta=True)
-        # print('DeepLiftShap Convergence Delta:', delta)
-        # print('Deep Lift SHAP Average delta per example:', torch.mean(delta.reshape(input_.shape[0], -1), dim=1))
-        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'DeepLiftShap', epoch)
 
         # Saliency
         saliency = Saliency(wrapper)
@@ -149,16 +123,6 @@ def main():
         gbp = GuidedBackprop(wrapper)
         attributions = gbp.attribute(input_, target=pred_class)
         save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'GuidedBackprop', epoch)
-
-        # # FeatureAblation
-        # ablator = FeatureAblation(wrapper)
-        # attributions = ablator.attribute(input_, target=pred_class, show_progress=True)
-        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'FeatureAblation', epoch)
-
-        # # Occlusion
-        # ablator = Occlusion(wrapper)
-        # attributions = ablator.attribute(input_, target=pred_class, sliding_window_shapes=(1, 3,3), show_progress=True)
-        # save_attr_mask(attributions, numpy_img_warped[:,:,::-1], 'Occlusion', epoch)
 
 
 def save_attr_mask(attributions, img, algo_name, epoch):
