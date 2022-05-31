@@ -70,7 +70,6 @@ matplotlib-inline==0.1.3
 mistune==0.8.4
 multidict==5.2.0
 mypy-extensions==0.4.3
--e git+ssh://git@github.com/RangiLyu/nanodet.git@3cda376ce0b237930933762e862a267319c06092#egg=nanodet
 nbclient==0.5.9
 nbconvert==6.0.7
 nbformat==5.1.3
